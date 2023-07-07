@@ -1369,14 +1369,21 @@ public class GeoServerSecurityManager implements ApplicationContextAware, Applic
         Authentication token =
                 new UsernamePasswordAuthenticationToken(
                         GeoServerUser.ADMIN_USERNAME, GeoServerUser.DEFAULT_ADMIN_PASSWD);
-
-        try {
-            token = providerMgr.authenticate(token);
-        } catch (Exception e) {
-            // ok
+        for (GeoServerAuthenticationProvider auth : getAuthenticationProviders()) {
+            // GEOS-10806 only check authentication providers that don't contact
+            // external systems.  At the moment there is only 1
+            if (auth instanceof UsernamePasswordAuthenticationProvider) {
+                try {
+                    if (auth.authenticate(token).isAuthenticated()) {
+                        return true;
+                    }
+                } catch (RuntimeException e) {
+                    // Ignore, this is not a real authentication
+                    LOGGER.log(Level.FINE, e.getMessage(), e);
+                }
+            }
         }
-
-        return token.isAuthenticated();
+        return false;
     }
 
     /** Lists all available filter configurations. */
